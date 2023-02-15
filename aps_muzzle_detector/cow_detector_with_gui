@@ -1,0 +1,114 @@
+import cv2
+import torch
+from PIL import Image
+from pathlib import Path
+import math
+import numpy as np
+# Model
+'''
+     This script was written for yolo model testing on a single image
+    'get_yolov5' will create a the custom model by our pre-trained custom weight.
+     then a image will be given in Image.open('folder location')
+     results.display will take multiple argments, if arguments are given as true
+     results will be shown for that parameters only
+'''
+
+def on_mouse(event, x, y, flags, param):
+    global ix, iy, lx, ly, rx, ry, cx, cy, points, flag
+    if event == cv2.EVENT_LBUTTONDOWN:
+        if len(points)<4:
+            
+            ix, iy = x, y
+            save_x, save_y = float(x/500), float(y/500)
+            points.append((save_x,save_y))
+            flag = True
+    elif event == cv2.EVENT_RBUTTONDOWN:
+        if len(points)>0:
+            points.pop()
+            flag = False
+    elif event == cv2.EVENT_MOUSEMOVE:
+        if flag:
+            cx, cy = x, y
+
+
+def get_yolov5():
+    model = torch.hub.load("F:/foruse_only_muzzle_detector_yolo/aps_muzzle_detector", 'custom', 
+            path="F:/foruse_only_muzzle_detector_yolo/aps_muzzle_detector/runs/weights/yolov5s_for_cow_detect.pt", source='local')
+    model.conf=0.7
+    return model
+
+# Images
+im1 = cv2.imread('C:/Users/IT BD/Desktop/test_image/edited_1.jpg')  
+im1=cv2.cvtColor(im1,cv2.COLOR_BGR2RGB)
+
+# Inference
+final_model = get_yolov5()
+results = final_model(im1, size=640)  # includes NMS
+crops = results.display(pprint=True, show=False, save= False, crop=True, render=True, labels=True) #save_dir=Path('E:/v2_data/2_not_detected'))
+# print(results.xyxy[0]) # im predictions (tensor)
+# print(results.pandas().xyxy[0])
+num_cow = len(crops)
+if num_cow == 1:
+    # image_array = crops[0]["im"]
+    img = im1
+    h,w,_ = img.shape
+    global ix, iy, lx, ly, rx, ry, cx, cy, points, flag
+    ix, iy, lx, ly, rx, ry, cx, cy = -1, -1, -1, -1, -1, -1, -1, -1
+    points = []
+    flag = False
+    terminate_flag = False
+    
+    cv2.namedWindow("image")
+    cv2.setMouseCallback("image", on_mouse)
+
+    img = cv2.resize(img, (500,500))
+    while True:
+        for point in points:
+            point = (int(point[0]*500), int(point[1]*500))
+            cv2.circle(img, point, 3, (0,0,255), -1)
+                    
+        if flag:
+            point = (int(point[0]*500), int(point[1]*500))
+            cv2.circle(img, (cx,cy), 3, (0,0,255), -1)
+        cv2.imshow("image", img)
+        k = cv2.waitKey(1)
+                
+        if k == ord('e'):
+            cv2.destroyAllWindows()
+            terminate_flag = True
+            break
+        img = im1#cv2.imread(os.path.join(path, file))
+        img = cv2.resize(img, (500,500))
+        #points = []
+        flag = False
+        if len(points) == 2:
+            points1 = points[0]
+            points2 = points[1]
+            distance = math.dist(points1,points2)
+            
+        if len(points) == 4:
+            points3 = points[2]
+            points4 = points[3]
+            distance2 = math.dist(points3,points4)
+            distance2 =distance2*2
+            
+            break
+    cv2.destroyAllWindows()
+length = (distance*500)
+Chest_grith = (distance2*500)
+print(length)
+print(Chest_grith)
+
+# Load Aruco detector
+parameters = cv2.aruco.DetectorParameters_create()
+aruco_dict = cv2.aruco.Dictionary_get(cv2.aruco.DICT_5X5_50)
+# Get Aruco marker
+img = cv2.resize(img, (0,0), None, 0.5, 0.5)
+corners, _, _ = cv2.aruco.detectMarkers(img, aruco_dict, parameters=parameters)
+print("this the corners",corners)
+# Aruco Perimeter
+aruco_perimeter = cv2.arcLength(corners[0], True)
+
+# Pixel to cm ratio
+pixel_cm_ratio = aruco_perimeter / 20
+  
